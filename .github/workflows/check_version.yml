@@ -19,10 +19,10 @@ jobs:
           "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
         
         # Check if versions are empty or null
-        #if [ -z "$MEMTEST_V" ] || [ "$MEMTEST_V" = "null" ] || [ -z "$AVAILABLE_V" ] || [ "$AVAILABLE_V" = "null" ]; then
-        #  echo "Couldn't get Version numbers"
-        #  exit 1
-        #fi
+        if [ -z "$MEMTEST_V" ] || [ "$MEMTEST_V" = "null" ] || [ -z "$AVAILABLE_V" ] || [ "$AVAILABLE_V" = "null" ]; then
+          echo "Couldn't get Version numbers"
+          exit 1
+        fi
         
         if [ "${MEMTEST_V#v}" != "${AVAILABLE_V#v}" ]; then
           echo "Newer version found: v${MEMTEST_V#v}"
