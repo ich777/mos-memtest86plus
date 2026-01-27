@@ -1,0 +1,36 @@
+name: Check Version
+on:
+  schedule:
+    - cron: '10 0 * * *'
+  workflow_dispatch:
+jobs:
+  check_version:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check version
+      run: |
+        # Get version from Memtest86+
+        MEMTEST_V=$(curl -s -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} https://api.github.com/repos/memtest86plus/memtest86plus/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+        
+        # Get version from this repo
+        AVAILABLE_V=$(curl -s \
+          -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+          -H "Accept: application/vnd.github.v3+json" \
+          "https://api.github.com/repos/${{ github.repository }}/releases/latest" | jq -r '.tag_name')
+        
+        # Check if versions are empty or null
+        if [ -z "$MEMTEST_V" ] || [ "$MEMTEST_V" = "null" ] || [ -z "$AVAILABLE_V" ] || [ "$AVAILABLE_V" = "null" ]; then
+          echo "Couldn't get Version numbers"
+          exit 1
+        fi
+        
+        if [ "${MEMTEST_V#v}" != "${AVAILABLE_V#v}" ]; then
+          echo "Newer version found: v${MEMTEST_V#v}"
+          curl -X POST \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/memtest86plus.yml/dispatches" \
+            -d "{\"ref\":\"master\"}"
+        else
+          echo "Nothing to do"
+        fi
