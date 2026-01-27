@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_qemu:
+  pack_memtest86plus:
     runs-on: ubuntu-latest
 
     steps:
