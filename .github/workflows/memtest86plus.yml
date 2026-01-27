@@ -15,7 +15,7 @@ jobs:
         fetch-depth: 1
 
     - name: Install dependencies
-      run: apt-get update && apt-get -y install curl wget p7zip
+      run: sudo apt-get update && sudo apt-get -y install curl wget p7zip
 
     - name: Pack Memtest86+
       run: |
