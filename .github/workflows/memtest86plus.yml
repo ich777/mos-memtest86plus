@@ -1,0 +1,79 @@
+name: Memtest86+ Pack & Upload
+
+on:
+  # Allow to trigger action manually
+  workflow_dispatch:
+
+jobs:
+  build_qemu:
+    runs-on: self-hosted
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 1
+
+    - name: Install dependencies
+      run: apt-get update && apt-get -y install curl wget p7zip
+
+    - name: Pack Memtest86+
+      run: |
+        # Get Memtest86+ version and set directories
+        MEMTEST_V=$(curl -s -u ${{ github.actor }}:${{ secrets.GITHUB_TOKEN }} https://api.github.com/repos/memtest86plus/memtest86plus/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+        BUILDDIR=${{ github.workspace }}/$MEMTEST_V
+        PACKAGEDIR=$BUILDDIR/memtest_package
+        mkdir -p $PACKAGEDIR
+
+        # Download latest memtest.ios.zip
+        cd $BUILDDIR
+        wget -q -O $BUILDDIR/memtest.iso.zip https://www.memtest.org/download/v${MEMTEST_V}/mt86plus_${MEMTEST_V}_x86_64.grub.iso.zip
+        unzip memtest.iso.zip
+        7z e *.iso boot/memtest
+        md5sum $BUILDDIR/memtest | awk '{print $1}' > $BUILDDIR/memtest.md5
+        cd $BUILDDIR
+        tar -czf $PACKAGEDIR/memtest-$MEMTEST_V.tar.gz memtest memtest.md5
+        md5sum $PACKAGEDIR/memtest-$MEMTEST_V.tar.gz | awk '{print $1}' > $PACKAGEDIR/memtest-$MEMTEST_V.tar.gz.md5
+        
+        echo "MEMTEST_V=${MEMTEST_V#v}
+        PACKAGEDIR=${PACKAGEDIR}" >> $GITHUB_ENV
+
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.MEMTEST_V }}
+        release_name: "Memtest86+ ${{ env.MEMTEST_V }}"
+        body: |
+          This is a custom package from Memtest86+ for MOS
+
+          ### Package contents:
+          - [Memtest86+](https://github.com/memtest86plus/memtest86plus) v${{ env.MEMTEST_V }}
+        draft: false
+        prerelease: false
+
+    - name: Upload .tar.gz to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ env.PACKAGEDIR }}/memtest-${{ env.MEMTEST_V }}.tar.gz
+        asset_name: memtest-${{ env.MEMTEST_V }}.tar.gz
+        asset_content_type: application/x-tgz
+
+    - name: Upload md5 to Release
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ${{ env.PACKAGEDIR }}/memtest-${{ env.MEMTEST_V }}.tar.gz.md5
+        asset_name: memtest-${{ env.MEMTEST_V }}.tar.gz.md5
+        asset_content_type: text/plain
+
+    - name: Cleanup
+      if: always()
+      run: rm -rf ${{ github.workspace }}/* ${{ github.workspace }}/.*
